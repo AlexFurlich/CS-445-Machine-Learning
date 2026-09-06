@@ -7,6 +7,7 @@ Author: CS445 Instructor and ???
 Version:
 
 """
+
 from collections import namedtuple, Counter
 import numpy as np
 
@@ -15,6 +16,31 @@ import numpy as np
 # You are free to add any private methods you like, but the
 # public API must match the provided docstrings below.
 # -----------------------------------------------------------------------
+
+
+def impurity(y, y_counts=None):
+    """Calculate Gini impurity for the class labels y.
+    If y_counts is provided it will be the counts of the labels in y.
+    """
+    # YOUR CODE HERE
+    if y_counts is None:
+        y_counts = Counter(y)
+    counts = np.array(list(y_counts.values()))
+    ratios = counts / counts.sum()
+    return 1 - np.sum(ratios**2)
+
+
+def weighted_impurity(split):
+    """Weighted gini impurity for a possible split."""
+    # YOUR CODE HERE
+    print(split)
+    total_num = np.concatenate((split.y_left, split.y_right)).shape[0]
+    left_imp = impurity(split.y_left, split.counts_left)
+    left_perc = split.y_left.shape[0] / total_num
+    right_imp = impurity(split.y_right, split.counts_right)
+    right_perc = split.y_right.shape[0] / total_num
+    return (left_perc * left_imp) + (right_perc * right_imp)
+
 
 # Named tuple is a quick way to create a simple wrapper class...
 Split_ = namedtuple(
@@ -124,7 +150,7 @@ class DecisionTreeClassifier:
 
         :param max_depth: limit on the tree depth (minimum is 1), None for no limit.
         """
-        raise NotImplementedError("DecisionTreeClassifier is not implemented yet.")
+        self.max_depth = max_depth
 
     def fit(self, X, y):
         """
@@ -133,7 +159,23 @@ class DecisionTreeClassifier:
         :param X: Numpy array of samples with shape (num_samples, num_features)
         :param y: Numpy array of targets with length num_samples
         """
-        raise NotImplementedError("DecisionTreeClassifier is not implemented yet.")
+        self.root = self._build(X, y)
+
+    # check against tests whether depth should be 0
+    def _build(self, X, y, depth=0):
+        if impurity(y) == 0:
+            return Node(X, y, leaf=True)
+        if (self.max_depth is not None) and (depth >= self.max_depth):
+            return Node(X, y, leaf=True)
+        split_gen = split_generator(X, y)
+        best = min(split_gen, key=weighted_impurity, default=None)
+        if best is None:
+            return Node(X, y, leaf=True)
+        node = Node(X, y, best)
+
+        node.left = self._build(best.X_left, best.y_left, depth + 1)
+        node.right = self._build(best.X_right, best.y_right, depth + 1)
+        return node
 
     def predict(self, X):
         """
@@ -145,6 +187,9 @@ class DecisionTreeClassifier:
         :param X:  Numpy array of samples with shape (num_samples, num_features)
         :return: A length num_samples numpy array containing predictions.
         """
+        if self.leaf is not None:
+            return np.array([Counter(self.y).most_common(1)[0][0]] * X.shape[0])
+
         raise NotImplementedError("DecisionTreeClassifier is not implemented yet.")
 
     def score(self, X, y):
@@ -188,6 +233,7 @@ class DecisionTreeClassifier:
         """
         :return: The depth of the decision tree.
         """
+        
         raise NotImplementedError("DecisionTreeClassifier is not implemented yet.")
 
 
@@ -204,10 +250,11 @@ class Node:
                 or Null for leaves
     """
 
-    def __init__(self, X, y, split=None):
+    def __init__(self, X, y, split=None, leaf=None):
         self.left = None
         self.right = None
         self.split = split
+        self.leaf = leaf
         # Feel free to add any other attributes you like.
 
 
