@@ -15,5 +15,15 @@ print("Test accuracy:", tree.score(X_test, y_test))
 print("Feature importances:", tree.feature_importances_)
 print("Tree depth:", tree.get_depth())
 
-predictions = tree.predict(X_test)
-draw_tree.draw_tree(X_train, y_train, tree)
+training_accuracies = []
+test_accuracies = []
+
+for depth in range(31):
+    tree = DecisionTreeClassifier(max_depth=depth)
+    tree.fit(X_train, y_train)
+
+    training_accuracies.append(tree.score(X_train, y_train))
+    test_accuracies.append(tree.score(X_test, y_test))
+
+print("training_accuracy = np.array(" + repr(training_accuracies) + ")")
+print("test_accuracy = np.array(" + repr(test_accuracies) + ")")
