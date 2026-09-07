@@ -22,7 +22,6 @@ def impurity(y, y_counts=None):
     """Calculate Gini impurity for the class labels y.
     If y_counts is provided it will be the counts of the labels in y.
     """
-    # YOUR CODE HERE
     if y_counts is None:
         y_counts = Counter(y)
     counts = np.array(list(y_counts.values()))
@@ -32,8 +31,6 @@ def impurity(y, y_counts=None):
 
 def weighted_impurity(split):
     """Weighted gini impurity for a possible split."""
-    # YOUR CODE HERE
-    print(split)
     total_num = np.concatenate((split.y_left, split.y_right)).shape[0]
     left_imp = impurity(split.y_left, split.counts_left)
     left_perc = split.y_left.shape[0] / total_num
@@ -151,6 +148,7 @@ class DecisionTreeClassifier:
         :param max_depth: limit on the tree depth (minimum is 1), None for no limit.
         """
         self.max_depth = max_depth
+        self._root = None
 
     def fit(self, X, y):
         """
@@ -159,18 +157,18 @@ class DecisionTreeClassifier:
         :param X: Numpy array of samples with shape (num_samples, num_features)
         :param y: Numpy array of targets with length num_samples
         """
-        self.root = self._build(X, y)
+        self._root = self._build(X, y)
 
     # check against tests whether depth should be 0
     def _build(self, X, y, depth=0):
         if impurity(y) == 0:
-            return Node(X, y, leaf=True)
+            return Node(X, y)
         if (self.max_depth is not None) and (depth >= self.max_depth):
-            return Node(X, y, leaf=True)
+            return Node(X, y)
         split_gen = split_generator(X, y)
         best = min(split_gen, key=weighted_impurity, default=None)
         if best is None:
-            return Node(X, y, leaf=True)
+            return Node(X, y)
         node = Node(X, y, best)
 
         node.left = self._build(best.X_left, best.y_left, depth + 1)
@@ -187,10 +185,19 @@ class DecisionTreeClassifier:
         :param X:  Numpy array of samples with shape (num_samples, num_features)
         :return: A length num_samples numpy array containing predictions.
         """
-        if self.leaf is not None:
-            return np.array([Counter(self.y).most_common(1)[0][0]] * X.shape[0])
+        predictions = []
+        for x in X:
+            node = self._root
+            predictions.append(self._recursive_predict(x, node))
+        return np.array(predictions)
 
-        raise NotImplementedError("DecisionTreeClassifier is not implemented yet.")
+    def _recursive_predict(self, x, node):
+        if node.split is None:
+            return Counter(node.y).most_common(1)[0][0]
+        if x[node.split.dim] <= node.split.pos:
+            return self._recursive_predict(x, node.left)
+        else:
+            return self._recursive_predict(x, node.right)
 
     def score(self, X, y):
         """
@@ -200,7 +207,8 @@ class DecisionTreeClassifier:
         :param y: Numpy array of targets with length num_samples
         :return: A float representing the fraction of correct predictions.
         """
-        raise NotImplementedError("DecisionTreeClassifier is not implemented yet.")
+        predictions = self.predict(X)
+        return np.mean(predictions == y)
 
     # Trailing underscore indicates properties that are only available after fitting.
     @property
@@ -216,6 +224,7 @@ class DecisionTreeClassifier:
         gini gain is the reduction in gini impurity from a split:
             gini_gain = gini_node - (gini_left * n_left/n_node
                                      + gini_right * n_right/n_node)
+            should be like impurity(node.y) - weighted_impurity(node.split)
 
         weighted: The contribution of each split is weighted by the fraction of
              the training samples that reach that node.
@@ -227,14 +236,45 @@ class DecisionTreeClassifier:
         :return: A numpy array with length num_features containing the
                  feature importances for each feature.
         """
-        raise NotImplementedError("DecisionTreeClassifier is not implemented yet.")
+        if self._root is None:
+            raise ValueError("The decision tree has not been fitted yet.")
+        if self._root.split is None:
+            return np.zeros(self._root.X.shape[1])
+        startergains = np.zeros(self._root.X.shape[1])
+        self._recursive_feature_importances(self._root, startergains)
+        return startergains / np.sum(startergains)
+
+    def _recursive_feature_importances(self, node, importances):
+        if node.split is None:
+            return
+        gini_gain_value = impurity(node.y) - weighted_impurity(node.split)
+        importances[node.split.dim] += (
+            node.X.shape[0] / self._root.X.shape[0]
+        ) * gini_gain_value
+        self._recursive_feature_importances(node.left, importances)
+        self._recursive_feature_importances(node.right, importances)
+        return importances
 
     def get_depth(self):
         """
         :return: The depth of the decision tree.
         """
-        
-        raise NotImplementedError("DecisionTreeClassifier is not implemented yet.")
+        if self._root is None:
+            return 0
+        else:
+            return self._recursive_get_depth(self._root)
+
+    def _recursive_get_depth(self, node):
+        """
+        Recursive helper function to calculate the depth of the decision tree.
+        :return: The depth of the decision tree.
+        """
+        if node.split is None:
+            return 0
+        else:
+            left_depth = self._recursive_get_depth(node.left)
+            right_depth = self._recursive_get_depth(node.right)
+            return 1 + max(left_depth, right_depth)
 
 
 class Node:
@@ -250,11 +290,12 @@ class Node:
                 or Null for leaves
     """
 
-    def __init__(self, X, y, split=None, leaf=None):
+    def __init__(self, X, y, split=None):
         self.left = None
         self.right = None
         self.split = split
-        self.leaf = leaf
+        self.X = X
+        self.y = y
         # Feel free to add any other attributes you like.
 
 
