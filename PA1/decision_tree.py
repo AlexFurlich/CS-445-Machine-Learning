@@ -3,8 +3,10 @@
 Simple binary decision tree classifier. Splits are based on gini impurity.
 API is a subset of the scikit-learn API.
 
-Author: CS445 Instructor and ???
-Version:
+Author: CS445 Instructor and Alex Furlich
+Note on AI use: I used Claude on the Web for advice,
+however I specifically asked for no code to be provided
+only hints as to where I a was going wrong.
 
 """
 
@@ -159,8 +161,14 @@ class DecisionTreeClassifier:
         """
         self._root = self._build(X, y)
 
-    # check against tests whether depth should be 0
     def _build(self, X, y, depth=0):
+        """
+        Recursive helper function to build the decision tree.
+        :param X: Numpy array of samples with shape (num_samples, num_features)
+        :param y: Numpy array of targets with length num_samples
+        :param depth: The current depth of the tree.
+        :return: The root node of the built tree.
+        """
         if impurity(y) == 0:
             return Node(X, y)
         if (self.max_depth is not None) and (depth >= self.max_depth):
@@ -192,6 +200,12 @@ class DecisionTreeClassifier:
         return np.array(predictions)
 
     def _recursive_predict(self, x, node):
+        """
+        Recursive helper function to predict the label for a single sample.
+        :param x: A single sample with shape (num_features,)
+        :param node: The current node in the tree.
+        :return: The predicted label for the sample.
+        """
         if node.split is None:
             return Counter(node.y).most_common(1)[0][0]
         if x[node.split.dim] <= node.split.pos:
@@ -245,6 +259,12 @@ class DecisionTreeClassifier:
         return startergains / np.sum(startergains)
 
     def _recursive_feature_importances(self, node, importances):
+        """
+        Recursive helper function to calculate feature importances.
+        :param node: The current node in the tree.
+        :param importances: A numpy array to store the feature importances.
+        :return: The updated feature importances array.
+        """
         if node.split is None:
             return
         gini_gain_value = impurity(node.y) - weighted_impurity(node.split)
